@@ -1,16 +1,21 @@
 import * as THREE from 'three';
+import { depth } from 'three/tsl';
 
 let forwardSpeed = 0
-let maximumSpeed = 0.1
+let maximumSpeed = 6
 let forwardHeld = false
 let turnLeft = false;
 let turnRight = false;
-let turnSpeed = 0.05
+let turnSpeed = 1
 
 const mapHeight = 50;
 const mapWidth = 50;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+const timer = new THREE.Timer();
+timer.connect(document)
+
 
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -26,26 +31,29 @@ scene.add(cube)
 camera.position.z = 15;
 
 function animate(time){
+    timer.update(time);
+    const delta = timer.getDelta()
+
     if (forwardHeld == true){
         if (forwardSpeed < maximumSpeed){
-            forwardSpeed = Math.min(maximumSpeed, forwardSpeed + 0.001)
+            forwardSpeed = Math.min(maximumSpeed, forwardSpeed + 0.1)
         }
         
     } else {
         if (forwardSpeed > 0){
-            forwardSpeed = Math.max(0, forwardSpeed - 0.001)
+            forwardSpeed = Math.max(0, forwardSpeed - 0.1)
         }
     }
 
     if (turnLeft == true && turnRight != true ){
-        cube.rotateZ(turnSpeed)
+        cube.rotateZ(turnSpeed* delta)
     }
     
 
     if (turnRight == true && turnLeft != true){
-        cube.rotateZ(-(turnSpeed))
+        cube.rotateZ(-(turnSpeed * delta))
     }
-    cube.translateY(forwardSpeed)
+    cube.translateY(delta * forwardSpeed)
     cube.position.x = THREE.MathUtils.clamp(cube.position.x, -(mapWidth / 2), mapWidth / 2)
     cube.position.y = THREE.MathUtils.clamp(cube.position.y, -(mapHeight / 2), (mapHeight / 2))
 
@@ -53,6 +61,9 @@ function animate(time){
     camera.position.y = cube.position.y;
     renderer.render(scene, camera)
     /* console.log(`X position: ${cube.position.x} \n Y position: ${cube.position.y}`) */
+    for (const star of stars){
+        star.material.opacity = 0.7 + Math.sin(time / 500 + star['pulseOffset']) * 0.3;
+    }
 };
 
 renderer.setAnimationLoop(animate)
@@ -84,6 +95,8 @@ window.addEventListener("keyup", (event) => {
     }
 })
 
+const stars = []
+
 function createStar(x, y){
     const starCanvas = document.createElement('canvas')
     starCanvas.width = 64;
@@ -106,8 +119,8 @@ function createStar(x, y){
     const starTexture = new THREE.CanvasTexture(starCanvas);
     const starMaterial = new THREE.SpriteMaterial({ map: starTexture });
     const star = new THREE.Sprite(starMaterial);
-
-    star.position.set(x, y, 0);
+    const depth = -2 - Math.random() * 8
+    star.position.set(x, y, depth);
     scene.add(star);
     return star
 };
@@ -121,7 +134,6 @@ function createBorderLine(){
     points.push(new THREE.Vector3(-(mapWidth/2), mapHeight/2, 0));
     points.push(new THREE.Vector3(-(mapWidth/2), -(mapHeight/2), 0));
     points.push(new THREE.Vector3(mapWidth/2, -(mapHeight/2), 0));
-
     
 
     const geometry = new THREE.BufferGeometry().setFromPoints(points)
@@ -156,7 +168,9 @@ for (let column = 0; column < numberOfColumns; column ++){
         const x = cellLeft + Math.random() * cell_width
         const y = cellBottom + Math.random() * cell_height
 
-        createStar(x, y)
+        const star = createStar(x, y)
+        star['pulseOffset'] = Math.random() * Math.PI * 2;
+        stars.push(star)
 
 
         /* draw top */
