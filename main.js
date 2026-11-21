@@ -107,7 +107,7 @@ function createStar(x, y){
     const starMaterial = new THREE.SpriteMaterial({ map: starTexture });
     const star = new THREE.Sprite(starMaterial);
 
-    star.position.set(x, y, -5);
+    star.position.set(x, y, 0);
     scene.add(star);
     return star
 };
@@ -140,8 +140,8 @@ function drawLine(firstPointX, firstPointY, secondPointX, secondPointY){
 }
 
 
-const numberOfColumns = 10;
-const numberOfRows = 10;
+const numberOfColumns = 20;
+const numberOfRows = 20;
 
 const cell_width = mapWidth / numberOfColumns
 const cell_height = mapHeight / numberOfColumns
@@ -152,6 +152,12 @@ for (let column = 0; column < numberOfColumns; column ++){
         const cellBottom = -(mapHeight/2) + (cell_height * row)
         const cellRight = cellLeft + cell_width
         const cellTop = cellBottom + cell_height
+        
+        const x = cellLeft + Math.random() * cell_width
+        const y = cellBottom + Math.random() * cell_height
+
+        createStar(x, y)
+
 
         /* draw top */
         drawLine(cellLeft, cellTop, cellRight, cellTop)
