@@ -52,8 +52,7 @@ function animate(time){
     camera.position.x = cube.position.x;
     camera.position.y = cube.position.y;
     renderer.render(scene, camera)
-    console.log(`X position: ${cube.position.x} \n Y position: ${cube.position.y}`)
-    star.material.opacity = 0.7 + Math.sin(time / 500) * 0.3
+    /* console.log(`X position: ${cube.position.x} \n Y position: ${cube.position.y}`) */
 };
 
 renderer.setAnimationLoop(animate)
@@ -123,17 +122,48 @@ function createBorderLine(){
     points.push(new THREE.Vector3(-(mapWidth/2), -(mapHeight/2), 0));
     points.push(new THREE.Vector3(mapWidth/2, -(mapHeight/2), 0));
 
-
+    
 
     const geometry = new THREE.BufferGeometry().setFromPoints(points)
     const line = new THREE.LineLoop(geometry, material)
     scene.add(line)
 }
 
-for (x in [-(mapWidth / 2), mapwidth/2]){
-    for (y in [-(mapwidth / 2), mapwidth /2]){
-        createStar(x, y)
+function drawLine(firstPointX, firstPointY, secondPointX, secondPointY){
+    const material = new THREE.LineBasicMaterial({ color: 0x0000ff});
+    const points = [];
+    points.push(new THREE.Vector3(firstPointX,  firstPointY, 0));
+    points.push(new THREE.Vector3(secondPointX,  secondPointY, 0));
+    const geometry = new THREE.BufferGeometry().setFromPoints(points)
+    const line = new THREE.Line(geometry, material);
+    scene.add(line)
+}
+
+
+const numberOfColumns = 10;
+const numberOfRows = 10;
+
+const cell_width = mapWidth / numberOfColumns
+const cell_height = mapHeight / numberOfColumns
+
+for (let column = 0; column < numberOfColumns; column ++){
+    for (let row = 0; row < numberOfRows; row ++){
+        const cellLeft = -(mapWidth/2) + (cell_width * column) 
+        const cellBottom = -(mapHeight/2) + (cell_height * row)
+        const cellRight = cellLeft + cell_width
+        const cellTop = cellBottom + cell_height
+
+        /* draw top */
+        drawLine(cellLeft, cellTop, cellRight, cellTop)
+        /* draw bottom */
+        drawLine(cellLeft, cellBottom, cellRight, cellBottom)
+        /* draw left */
+        drawLine(cellLeft, cellTop, cellLeft, cellBottom)
+        /* draw right */
+        drawLine(cellRight, cellTop, cellRight, cellBottom)
+
     }
 }
-    
+
+
 createBorderLine()
