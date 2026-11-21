@@ -7,7 +7,7 @@ let forwardHeld = false
 let turnLeft = false;
 let turnRight = false;
 let turnSpeed = 1
-
+let targetTilt = 0;
 const mapHeight = 50;
 const mapWidth = 50;
 const scene = new THREE.Scene();
@@ -24,7 +24,9 @@ document.body.appendChild(renderer.domElement);
 const geometry = new THREE.BoxGeometry(1, 3, 1);
 const material = new THREE.MeshBasicMaterial({color: 0x00ff00});
 const cube = new THREE.Mesh(geometry, material);
-scene.add(cube)
+const group = new THREE.Group();
+group.add(cube)
+scene.add(group)
 
 
 
@@ -46,19 +48,33 @@ function animate(time){
     }
 
     if (turnLeft == true && turnRight != true ){
-        cube.rotateZ(turnSpeed* delta)
+        group.rotateZ(turnSpeed* delta)
+
+        /* spaceship tilting on the y axis when turning left or right */
+        cube.rotation.y = (THREE.MathUtils.damp(cube.rotation.y, -(THREE.MathUtils.degToRad(30)), 1, delta))
+
     }
+
     
 
     if (turnRight == true && turnLeft != true){
-        cube.rotateZ(-(turnSpeed * delta))
+        group.rotateZ(-(turnSpeed * delta))
+        /* spaceship tilting on the y axis when turning left or right */
+        cube.rotation.y = (THREE.MathUtils.damp(cube.rotation.y, THREE.MathUtils.degToRad(30), 1, delta))
     }
-    cube.translateY(delta * forwardSpeed)
-    cube.position.x = THREE.MathUtils.clamp(cube.position.x, -(mapWidth / 2), mapWidth / 2)
-    cube.position.y = THREE.MathUtils.clamp(cube.position.y, -(mapHeight / 2), (mapHeight / 2))
 
-    camera.position.x = cube.position.x;
-    camera.position.y = cube.position.y;
+    /* return to tilt 0 when neither key is held*/
+    if (turnRight != true && turnLeft != true){
+        cube.rotation.y = (THREE.MathUtils.damp(cube.rotation.y, THREE.MathUtils.degToRad(0), 2, delta))
+    }
+
+    group.translateY(delta * forwardSpeed)
+
+    group.position.x = THREE.MathUtils.clamp(group.position.x, -(mapWidth / 2), mapWidth / 2)
+    group.position.y = THREE.MathUtils.clamp(group.position.y, -(mapHeight / 2), (mapHeight / 2))
+
+    camera.position.x = group.position.x;
+    camera.position.y = group.position.y;
     renderer.render(scene, camera)
     /* console.log(`X position: ${cube.position.x} \n Y position: ${cube.position.y}`) */
     for (const star of stars){
