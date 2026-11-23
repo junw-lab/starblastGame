@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { depth } from 'three/tsl';
+import planck from 'planck';
 
+const world = new planck.World({gravity: {x:0, y:0}});
+/* scene and ship creation */
 let forwardSpeed = 0
 let maximumSpeed = 6
 let forwardHeld = false
@@ -12,6 +15,8 @@ const mapHeight = 50;
 const mapWidth = 50;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+
 
 const timer = new THREE.Timer();
 timer.connect(document)
@@ -27,52 +32,82 @@ const cube = new THREE.Mesh(geometry, material);
 const group = new THREE.Group();
 group.add(cube)
 scene.add(group)
-
-
-
 camera.position.z = 15;
 
+/* planck js */
+let shipBody = world.createBody({
+    type: "dynamic",
+    position: {x: cube.position.x, y: cube.position.y}
+})
+
+shipBody.createFixture({
+    shape: new planck.Box(cube['geometry']['parameters']['width']/2, cube['geometry']['parameters']['height']/2 ),
+    density: 1.0,
+    friction: 0.3,
+})
+
+const localForce = {x: 0, y: 10};
+
+
+
+/* animation loop */
 function animate(time){
     timer.update(time);
-    const delta = timer.getDelta()
+    
+    const worldVelocity = shipBody.getLinearVelocity();
+    const localVelocity = shipBody.getLocalVector(worldVelocity)
+    const sidewaysForce = {
+        x: -localVelocity.x * 10,
+        y: 0
+    }
+    const worldSidewaysForce = shipBody.getWorldVector(sidewaysForce)
 
+    console.log(`Local Velocity: ${localVelocity}`)
+    const delta = timer.getDelta()
     if (forwardHeld == true){
-        if (forwardSpeed < maximumSpeed){
-            forwardSpeed = Math.min(maximumSpeed, forwardSpeed + 0.1)
-        }
+        const worldForce = shipBody.getWorldVector(localForce)
+        shipBody.applyForce(worldForce, shipBody.getWorldCenter())
+        shipBody.applyForce(worldSidewaysForce, shipBody.getWorldCenter())
+    } else{
         
-    } else {
-        if (forwardSpeed > 0){
-            forwardSpeed = Math.max(0, forwardSpeed - 0.1)
-        }
+        cube.rotation.y = THREE.MathUtils.damp((cube.rotation.y),0, 2, delta )
+
     }
 
     if (turnLeft == true && turnRight != true ){
-        group.rotateZ(turnSpeed* delta)
+        shipBody.setAngularVelocity(turnSpeed)
+        shipBody.applyForce(worldSidewaysForce, shipBody.getWorldCenter())
 
         /* spaceship tilting on the y axis when turning left or right */
         cube.rotation.y = (THREE.MathUtils.damp(cube.rotation.y, -(THREE.MathUtils.degToRad(30)), 1, delta))
 
     }
 
-    
+    group.rotation.z = shipBody.getAngle();
 
-    if (turnRight == true && turnLeft != true){
-        group.rotateZ(-(turnSpeed * delta))
+    if (turnRight == true && turnLeft != true ){
+        shipBody.setAngularVelocity(-(turnSpeed))
+        shipBody.applyForce(worldSidewaysForce, shipBody.getWorldCenter())
+
         /* spaceship tilting on the y axis when turning left or right */
-        cube.rotation.y = (THREE.MathUtils.damp(cube.rotation.y, THREE.MathUtils.degToRad(30), 1, delta))
+        cube.rotation.y = (THREE.MathUtils.damp(cube.rotation.y, (THREE.MathUtils.degToRad(30)), 1, delta))
+
     }
-
-    /* return to tilt 0 when neither key is held*/
-    if (turnRight != true && turnLeft != true){
-        cube.rotation.y = (THREE.MathUtils.damp(cube.rotation.y, THREE.MathUtils.degToRad(0), 2, delta))
+    if (turnRight == false && turnLeft == false){
+        
+        shipBody.setAngularVelocity(0)
     }
+    const shipPosition = shipBody.getPosition()
+    group.position.x = shipPosition['x']
+    group.position.y = shipPosition['y']
 
-    group.translateY(delta * forwardSpeed)
-
+    
     group.position.x = THREE.MathUtils.clamp(group.position.x, -(mapWidth / 2), mapWidth / 2)
     group.position.y = THREE.MathUtils.clamp(group.position.y, -(mapHeight / 2), (mapHeight / 2))
 
+    
+
+    world.step(delta);
     camera.position.x = group.position.x;
     camera.position.y = group.position.y;
     renderer.render(scene, camera)
@@ -85,6 +120,7 @@ function animate(time){
 renderer.setAnimationLoop(animate)
 
 
+/* input */ 
 window.addEventListener("keydown", (event) => {
     if (event.key == 'w'){
         forwardHeld = true
@@ -111,6 +147,7 @@ window.addEventListener("keyup", (event) => {
     }
 })
 
+/* background */
 const stars = []
 
 function createStar(x, y){
