@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { depth } from 'three/tsl';
-import planck from 'planck';
-
+import * as planck from 'planck';
 const world = new planck.World({gravity: {x:0, y:0}});
 /* scene and ship creation */
 let forwardSpeed = 0
@@ -9,14 +8,15 @@ let maximumSpeed = 6
 let forwardHeld = false
 let turnLeft = false;
 let turnRight = false;
-let turnSpeed = 1
+let turnSpeed = 3
 let targetTilt = 0;
+let recoverAngularVelocity = 0.5;
 const mapHeight = 50;
 const mapWidth = 50;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 
-
+let hitWall = false
 
 const timer = new THREE.Timer();
 timer.connect(document)
@@ -37,7 +37,9 @@ camera.position.z = 15;
 /* planck js */
 let shipBody = world.createBody({
     type: "dynamic",
-    position: {x: cube.position.x, y: cube.position.y}
+    position: {x: cube.position.x, y: cube.position.y},
+    userData: 'ship',
+
 })
 
 shipBody.createFixture({
@@ -46,9 +48,16 @@ shipBody.createFixture({
     friction: 0.3,
 })
 
-const localForce = {x: 0, y: 10};
+const localForce = {x: 0, y: 20};
 
-
+world.on('begin-contact', function(contact){
+    const contactAName = (contact.getFixtureA().getBody().getUserData())
+    const contactBName = (contact.getFixtureB().getBody().getUserData())
+    if (contactAName == 'ship' && contactBName == 'wall' || contactBName == 'ship' && contactAName == 'wall'){
+        hitWall = true
+        console.log("hit wall")
+        setTimeout(() => {hitWall = false}, 500)
+    }})
 
 /* animation loop */
 function animate(time){
@@ -61,13 +70,13 @@ function animate(time){
         y: 0
     }
     const worldSidewaysForce = shipBody.getWorldVector(sidewaysForce)
-
-    console.log(`Local Velocity: ${localVelocity}`)
+    shipBody.applyForce(worldSidewaysForce, shipBody.getWorldCenter())  
+    //console.log(`Local Velocity: ${localVelocity}`)
     const delta = timer.getDelta()
     if (forwardHeld == true){
         const worldForce = shipBody.getWorldVector(localForce)
         shipBody.applyForce(worldForce, shipBody.getWorldCenter())
-        shipBody.applyForce(worldSidewaysForce, shipBody.getWorldCenter())
+
     } else{
         
         cube.rotation.y = THREE.MathUtils.damp((cube.rotation.y),0, 2, delta )
@@ -76,7 +85,6 @@ function animate(time){
 
     if (turnLeft == true && turnRight != true ){
         shipBody.setAngularVelocity(turnSpeed)
-        shipBody.applyForce(worldSidewaysForce, shipBody.getWorldCenter())
 
         /* spaceship tilting on the y axis when turning left or right */
         cube.rotation.y = (THREE.MathUtils.damp(cube.rotation.y, -(THREE.MathUtils.degToRad(30)), 1, delta))
@@ -87,24 +95,36 @@ function animate(time){
 
     if (turnRight == true && turnLeft != true ){
         shipBody.setAngularVelocity(-(turnSpeed))
-        shipBody.applyForce(worldSidewaysForce, shipBody.getWorldCenter())
 
         /* spaceship tilting on the y axis when turning left or right */
         cube.rotation.y = (THREE.MathUtils.damp(cube.rotation.y, (THREE.MathUtils.degToRad(30)), 1, delta))
 
     }
     if (turnRight == false && turnLeft == false){
-        
-        shipBody.setAngularVelocity(0)
-    }
+        if (shipBody.getAngularVelocity() > 0){
+            shipBody.setAngularVelocity(Math.max(0, shipBody.getAngularVelocity() - recoverAngularVelocity))
+        } 
+        if (shipBody.getAngularVelocity() < 0){
+            shipBody.setAngularVelocity(Math.min(0, shipBody.getAngularVelocity() + recoverAngularVelocity))
+        }
+
+        }
     const shipPosition = shipBody.getPosition()
     group.position.x = shipPosition['x']
     group.position.y = shipPosition['y']
 
-    
-    group.position.x = THREE.MathUtils.clamp(group.position.x, -(mapWidth / 2), mapWidth / 2)
-    group.position.y = THREE.MathUtils.clamp(group.position.y, -(mapHeight / 2), (mapHeight / 2))
+    const limitShipPositionX = THREE.MathUtils.clamp(shipPosition.x, -mapWidth /2 , mapWidth / 2)
+    const limitShipPositionY = THREE.MathUtils.clamp(shipPosition.y, -mapWidth /2 , mapWidth / 2)
 
+    group.position.set(limitShipPositionX, limitShipPositionY, 0)
+    shipBody.setPosition({x: limitShipPositionX, y: limitShipPositionY})
+
+    
+    // console.log(`Ship Body position: ${shipBody.getPosition()}`)
+    // console.log(`Group Body position: ${group.position.x} ${group.position.y}`)
+
+    // group.position.x = THREE.MathUtils.clamp(group.position.x, -(mapWidth / 2), mapWidth / 2)
+    // group.position.y = THREE.MathUtils.clamp(group.position.y, -(mapHeight / 2), (mapHeight / 2))
     
 
     world.step(delta);
@@ -180,7 +200,7 @@ function createStar(x, y){
 
 function createBorderLine(){
     const material = new THREE.LineBasicMaterial({
-        'color': 0x0000ff,
+        'color': 0xFFFFFF,
     })
     const points = [];
     points.push(new THREE.Vector3(mapWidth/2, mapHeight/2, 0));
@@ -194,15 +214,16 @@ function createBorderLine(){
     scene.add(line)
 }
 
-function drawLine(firstPointX, firstPointY, secondPointX, secondPointY){
-    const material = new THREE.LineBasicMaterial({ color: 0x0000ff});
+function drawLine(firstPointX, firstPointY, secondPointX, secondPointY, color= 0x000ff, z=0){
+    const material = new THREE.LineBasicMaterial({ color: color});
     const points = [];
-    points.push(new THREE.Vector3(firstPointX,  firstPointY, 0));
-    points.push(new THREE.Vector3(secondPointX,  secondPointY, 0));
+    points.push(new THREE.Vector3(firstPointX,  firstPointY, z));
+    points.push(new THREE.Vector3(secondPointX,  secondPointY, z));
     const geometry = new THREE.BufferGeometry().setFromPoints(points)
     const line = new THREE.Line(geometry, material);
     scene.add(line)
 }
+
 
 
 const numberOfColumns = 20;
@@ -213,30 +234,59 @@ const cell_height = mapHeight / numberOfColumns
 
 for (let column = 0; column < numberOfColumns; column ++){
     for (let row = 0; row < numberOfRows; row ++){
-        const cellLeft = -(mapWidth/2) + (cell_width * column) 
-        const cellBottom = -(mapHeight/2) + (cell_height * row)
-        const cellRight = cellLeft + cell_width
-        const cellTop = cellBottom + cell_height
-        
-        const x = cellLeft + Math.random() * cell_width
-        const y = cellBottom + Math.random() * cell_height
+        if (row != 0 || row != numberOfRows - 1 || column != 0 || column != numberOfColumns - 1 ){
 
-        const star = createStar(x, y)
-        star['pulseOffset'] = Math.random() * Math.PI * 2;
-        stars.push(star)
+            const cellLeft = -(mapWidth/2) + (cell_width * column) 
+            const cellBottom = -(mapHeight/2) + (cell_height * row)
+            const cellRight = cellLeft + cell_width
+            const cellTop = cellBottom + cell_height
+            
+            const x = cellLeft + Math.random() * cell_width
+            const y = cellBottom + Math.random() * cell_height
+
+            const star = createStar(x, y)
+            star['pulseOffset'] = Math.random() * Math.PI * 2;
+            stars.push(star)
 
 
-        /* draw top */
-        drawLine(cellLeft, cellTop, cellRight, cellTop)
-        /* draw bottom */
-        drawLine(cellLeft, cellBottom, cellRight, cellBottom)
-        /* draw left */
-        drawLine(cellLeft, cellTop, cellLeft, cellBottom)
-        /* draw right */
-        drawLine(cellRight, cellTop, cellRight, cellBottom)
+            /* draw top */
+            drawLine(cellLeft, cellTop, cellRight, cellTop)
+            /* draw bottom */
+            drawLine(cellLeft, cellBottom, cellRight, cellBottom)
+            /* draw left */
+            drawLine(cellLeft, cellTop, cellLeft, cellBottom)
+            /* draw right */
+            drawLine(cellRight, cellTop, cellRight, cellBottom)
 
+        }
     }
 }
 
+function createBorderChain(){
+    let chain = new planck.Chain();
+    let vs = [
 
+        new planck.Vec2(mapWidth/2, mapHeight/2),
+        new planck.Vec2(-mapWidth/2, mapHeight/2),
+        new planck.Vec2(-mapWidth/2, -mapHeight/2),
+        new planck.Vec2(mapWidth/2, -mapHeight/2)
+
+    ]
+    chain = new planck.Chain(vs, true)
+    let wallBody = world.createBody({
+        userData: 'wall'
+    }
+    )
+    let wallFixture = wallBody.createFixture({
+        type: "static",
+        shape: chain,
+        density: 0,
+        restitution: 0.7,
+    })
+
+
+}
+
+createBorderChain()
+// drawLine(-(mapWidth/2), mapHeight /2, mapWidth/2, mapHeight/ 2, 0xFFFFFF, 0)
 createBorderLine()
