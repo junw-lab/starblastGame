@@ -10,7 +10,7 @@ let turnLeft = false;
 let turnRight = false;
 let turnSpeed = 3
 let targetTilt = 0;
-let recoverAngularVelocity = 0.5;
+let recoverAngularVelocity = 15;
 const mapHeight = 50;
 const mapWidth = 50;
 const scene = new THREE.Scene();
@@ -100,12 +100,14 @@ function animate(time){
         cube.rotation.y = (THREE.MathUtils.damp(cube.rotation.y, (THREE.MathUtils.degToRad(30)), 1, delta))
 
     }
+    
+    //angular velocity recovery
     if (turnRight == false && turnLeft == false){
         if (shipBody.getAngularVelocity() > 0){
-            shipBody.setAngularVelocity(Math.max(0, shipBody.getAngularVelocity() - recoverAngularVelocity))
+            shipBody.setAngularVelocity(Math.max(0, shipBody.getAngularVelocity() - recoverAngularVelocity * delta))
         } 
         if (shipBody.getAngularVelocity() < 0){
-            shipBody.setAngularVelocity(Math.min(0, shipBody.getAngularVelocity() + recoverAngularVelocity))
+            shipBody.setAngularVelocity(Math.min(0, shipBody.getAngularVelocity() + recoverAngularVelocity * delta))
         }
 
         }
