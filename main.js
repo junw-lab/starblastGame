@@ -15,6 +15,7 @@ const mapHeight = 50;
 const mapWidth = 50;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const forwardForce = {x: 0, y: 20};
 
 let hitWall = false
 
@@ -48,7 +49,6 @@ shipBody.createFixture({
     friction: 0.3,
 })
 
-const localForce = {x: 0, y: 20};
 
 world.on('begin-contact', function(contact){
     const contactAName = (contact.getFixtureA().getBody().getUserData())
@@ -62,23 +62,33 @@ world.on('begin-contact', function(contact){
 /* animation loop */
 function animate(time){
     timer.update(time);
-    
-    const worldVelocity = shipBody.getLinearVelocity();
-    const localVelocity = shipBody.getLocalVector(worldVelocity)
+    const shipVelocity = shipBody.getLinearVelocity();
+    const localShipVelocity = shipBody.getLocalVector(shipVelocity)
+    console.log(localShipVelocity['y'])
     const sidewaysForce = {
-        x: -localVelocity.x * 10,
+        x: -localShipVelocity.x * 10,
         y: 0
+    }
+    const backwardsForce = {
+        x: 0,
+        y: -localShipVelocity.y * 4,
     }
     const worldSidewaysForce = shipBody.getWorldVector(sidewaysForce)
     shipBody.applyForce(worldSidewaysForce, shipBody.getWorldCenter())  
-    //console.log(`Local Velocity: ${localVelocity}`)
     const delta = timer.getDelta()
-    if (forwardHeld == true){
-        const worldForce = shipBody.getWorldVector(localForce)
-        shipBody.applyForce(worldForce, shipBody.getWorldCenter())
 
-    } else{
+    if (forwardHeld == true){
+        const worldForce = shipBody.getWorldVector(forwardForce)
+        shipBody.applyForce(worldForce, shipBody.getWorldCenter())
         
+    } else{
+        if (localShipVelocity['y'] != 0){
+            const worldBackwardsForce = shipBody.getWorldVector(backwardsForce)
+            // if (Math.min(0, worldBackwardsForce.y) != 0){
+                shipBody.applyForce(worldBackwardsForce, shipBody.getWorldCenter())
+            // }
+
+        }
         cube.rotation.y = THREE.MathUtils.damp((cube.rotation.y),0, 2, delta )
 
     }
@@ -109,17 +119,16 @@ function animate(time){
         if (shipBody.getAngularVelocity() < 0){
             shipBody.setAngularVelocity(Math.min(0, shipBody.getAngularVelocity() + recoverAngularVelocity * delta))
         }
-
         }
     const shipPosition = shipBody.getPosition()
     group.position.x = shipPosition['x']
     group.position.y = shipPosition['y']
 
-    const limitShipPositionX = THREE.MathUtils.clamp(shipPosition.x, -mapWidth /2 , mapWidth / 2)
-    const limitShipPositionY = THREE.MathUtils.clamp(shipPosition.y, -mapWidth /2 , mapWidth / 2)
+    // const limitShipPositionX = THREE.MathUtils.clamp(shipPosition.x, -mapWidth /2 , mapWidth / 2)
+    // const limitShipPositionY = THREE.MathUtils.clamp(shipPosition.y, -mapWidth /2 , mapWidth / 2)
 
-    group.position.set(limitShipPositionX, limitShipPositionY, 0)
-    shipBody.setPosition({x: limitShipPositionX, y: limitShipPositionY})
+    // group.position.set(limitShipPositionX, limitShipPositionY, 0)
+    // shipBody.setPosition({x: limitShipPositionX, y: limitShipPositionY})
 
     
     // console.log(`Ship Body position: ${shipBody.getPosition()}`)
